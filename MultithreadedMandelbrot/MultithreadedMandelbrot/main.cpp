@@ -2,7 +2,13 @@
 #include <complex>
 #include <fstream>
 #include <thread>
-constexpr int WIDTH = 600, HEIGHT = 600, MAX_IT = 500;
+#include <chrono>
+#include <iostream>
+
+
+#define Multi 1;
+
+constexpr int WIDTH = 1920, HEIGHT = 1920, MAX_IT = 5500;
 
 
 
@@ -57,8 +63,68 @@ double mandelbrot(double cr, double ci)
 
 }
 
+#if Multi
+
+void renderRow(int y, std::vector<double>& buf)
+{
+    for (int x = 0; x < WIDTH; ++x)
+    {
+        double cr = (x - WIDTH / 2.0) * 4.0 / WIDTH;
+        double ci = (y - HEIGHT / 2.0) * 4.0 / HEIGHT;
+        buf[y * WIDTH + x] = mandelbrot(cr, ci);
+    }
+}
+
 int main() 
 {
+    auto start = std::chrono::high_resolution_clock::now();
+
+    std::vector<double> buffer(WIDTH * HEIGHT);
+
+
+    std::vector<std::thread> threads;
+    for (int y = 0; y < HEIGHT; ++y)
+        threads.emplace_back(renderRow, y, std::ref(buffer));
+
+    for (auto& t : threads) t.join();
+
+
+
+    std::ofstream ofs("mandelbrot.ppm");
+    ofs << "P3\n" << WIDTH << " " << HEIGHT << " 255\n";
+    for (double v : buffer)
+    {
+
+
+        double J = v / double(MAX_IT);
+
+        J = pow(J, 0.4);
+
+        float hue = float(fmod(J * 360.0 + 240, 360.0));
+
+        float value = (v < MAX_IT) ? 1.0f : 0.0f;
+
+
+        RGB color = hsvToRgb(hue, 1.0f, value);
+        ofs << color.r << ' ' << color.g << ' ' << color.b << '\n';
+
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::cout << "Time taken: " << duration << " ms" << std::endl;
+
+
+}
+
+#else
+
+int main() 
+{
+    auto start = std::chrono::high_resolution_clock::now();
+
     std::vector<double> buffer(WIDTH * HEIGHT);
 
     for (int y = 0; y < HEIGHT; ++y) 
@@ -81,48 +147,33 @@ int main()
     {
 
 
-
-
-      /*  float J = (float)v / (float)MAX_IT;
-
-      
-        int r = J * 255;
-        int g = J * 255;
-        int b = J * 255;
-
-        ofs << r  << ' ' << g << ' ' << b << '\n';*/
-
-
         double J = v / double(MAX_IT);
+    
+        J = pow(J, 0.4);
 
-        float hue =  J*360;
-        RGB Color;
-        Color = hsvToRgb(240+hue, 1.0f, J != 1.0f ? 1.0f : 0.0f);
-     //   Color = hsvToRgb(hue, 1.0f, 0.2f);
+        float hue = float(fmod(J * 360.0+240, 360.0));
 
-        ofs << Color.r << ' ' << Color.g << ' ' << Color.b << '\n';
+        float value = (v < MAX_IT) ? 1.0f : 0.0f;
+
+
+        RGB color = hsvToRgb(hue, 1.0f, value);
+        ofs << color.r << ' ' << color.g << ' ' << color.b << '\n';
 
 
     }
+
+    auto end = std::chrono::high_resolution_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::cout << "Time taken: " << duration << " ms" << std::endl;
+
+
 }
 
 
-//void renderRow(int y, std::vector<int>& buf) {
-//    for (int x = 0; x < WIDTH; ++x) {
-//        double cr = (x - WIDTH / 2.0) * 4.0 / WIDTH;
-//        double ci = (y - HEIGHT / 2.0) * 4.0 / HEIGHT;
-//        buf[y * WIDTH + x] = mandelbrot(cr, ci);
-//    }
-//}
-//
-//int main() {
-//    std::vector<int> buffer(WIDTH * HEIGHT);
-//    std::vector<std::thread> threads;
-//    for (int y = 0; y < HEIGHT; ++y)
-//        threads.emplace_back(renderRow, y, std::ref(buffer));
-//    for (auto& t : threads) t.join();
-//
-//    std::ofstream ofs("mandelbrot.ppm");
-//    ofs << "P3\n" << WIDTH << " " << HEIGHT << " 255\n";
-//    for (int v : buffer) ofs << (v % 256) << ' ' << (v % 256) << ' ' << (v % 256) << '\n';
-//}
+
+
+
+
+#endif 
