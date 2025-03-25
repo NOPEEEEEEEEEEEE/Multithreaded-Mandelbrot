@@ -8,9 +8,9 @@
 
 #define Multi 1;
 
-constexpr int WIDTH = 1920, HEIGHT = 1920, MAX_IT = 5500;
+constexpr int WIDTH = 1920, HEIGHT = 1920, MAX_IT = 5500, THR_COUNT =128;
 
-
+constexpr int LINE = HEIGHT / THR_COUNT;
 
 struct RGB { int r, g, b; };
 
@@ -65,13 +65,17 @@ double mandelbrot(double cr, double ci)
 
 #if Multi
 
-void renderRow(int y, std::vector<double>& buf)
+void renderRow(int thr_k, std::vector<double>& buf)
 {
-    for (int x = 0; x < WIDTH; ++x)
+ 
+    for (int y = thr_k * LINE; y < std::min(thr_k * LINE+LINE, HEIGHT); ++y)
     {
-        double cr = (x - WIDTH / 2.0) * 4.0 / WIDTH;
-        double ci = (y - HEIGHT / 2.0) * 4.0 / HEIGHT;
-        buf[y * WIDTH + x] = mandelbrot(cr, ci);
+        for (int x = 0; x < WIDTH; ++x)
+        {
+            double cr = (x - WIDTH / 2.0) * 4.0 / WIDTH;
+            double ci = (y - HEIGHT / 2.0) * 4.0 / HEIGHT;
+            buf[y * WIDTH + x] = mandelbrot(cr, ci);
+        }
     }
 }
 
@@ -82,10 +86,19 @@ int main()
     std::vector<double> buffer(WIDTH * HEIGHT);
 
 
-    std::vector<std::thread> threads;
-    for (int y = 0; y < HEIGHT; ++y)
-        threads.emplace_back(renderRow, y, std::ref(buffer));
+    std::vector<std::thread> threads; 
+    
+    int c = 0;
+    for (int k = 0; k < THR_COUNT; ++k)
+    {
+        c++;
+        threads.emplace_back(renderRow, k, std::ref(buffer));
+    }
+  
 
+
+
+    std::cout <<"Threads:" << c << std::endl;
     for (auto& t : threads) t.join();
 
 
